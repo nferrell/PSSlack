@@ -11,13 +11,14 @@ $ModulePath = Join-Path $ENV:BHProjectPath $ModuleName
         $Verbose.add("Verbose",$True)
     }
 
-
 Import-Module $ModulePath -Force
 
 $TestUri = 'TestUri'
 $TestToken = 'TestToken'
 $TestArchive = 'TestArchive'
-$AlternativePath = 'C:\ThisSlackXml.xml'
+$TestProxy = 'TestProxy'
+
+$AlternativePath = 'TestDrive:\ThisSlackXml.xml'
 
 Describe "PSSlack Module PS$PSVersion" {
     Context 'Strict mode' {
@@ -26,7 +27,7 @@ Describe "PSSlack Module PS$PSVersion" {
 
         It 'Should load' {
             $Module = Get-Module $ModuleName
-            $Module.Name | Should be $ModuleName
+            $Module.Name | Should Be $ModuleName
             $Commands = $Module.ExportedCommands.Keys
             $Commands -contains 'Find-SlackMessage' | Should Be $True
             $Commands -contains 'Get-PSSlackConfig' | Should Be $True
@@ -40,12 +41,15 @@ Describe "PSSlack Module PS$PSVersion" {
             $Config = Import-Clixml "$ModulePath\$env:USERNAME-$env:COMPUTERNAME-PSSlack.xml"
             $Props = $Config.PSObject.Properties.Name
             #Loop is faster but less clear in failed tests.
-            $Props -contains 'Uri' | Should be $True
-            $Props -contains 'Token' | Should be $True
-            $Props -contains 'ArchiveUri' | Should be $True
+            $Props -contains 'Uri' | Should Be $True
+            $Props -contains 'Token' | Should Be $True
+            $Props -contains 'ArchiveUri' | Should Be $True
+            $Props -contains 'Proxy' | Should Be $True
+
             $Config.Uri | Should BeNullOrEmpty
             $Config.Token | Should BeNullOrEmpty
             $Config.ArchiveUri | Should BeNullOrEmpty
+            $Config.Proxy | Should BeNullOrEmpty
         }
     }
 }
@@ -59,14 +63,16 @@ Describe "Set-PSSlackConfig PS$PSVersion" {
             $Params = @{
                 Uri= $TestUri
                 Token = $TestToken
-                ArchiveUri = "$TestArchive"
+                ArchiveUri = $TestArchive
+                Proxy = $TestProxy
             }
             Set-PSSlackConfig @params
             $Config = Import-Clixml "$ModulePath\$env:USERNAME-$env:COMPUTERNAME-PSSlack.xml"
 
-            $Config.Uri | Should be 'System.Security.SecureString'
-            $Config.Token | Should be 'System.Security.SecureString'
-            $Config.ArchiveUri | Should be 'TestArchive'
+            $Config.Uri | Should BeOfType System.Security.SecureString
+            $Config.Token | Should BeOfType System.Security.SecureString
+            $Config.ArchiveUri | Should Be 'TestArchive'
+            $Config.Proxy | Should Be 'TestProxy'
         }
 
         It 'Should set a user-specified file' {
@@ -74,14 +80,16 @@ Describe "Set-PSSlackConfig PS$PSVersion" {
                 Uri= $TestUri
                 Token = $TestToken
                 ArchiveUri = "$TestArchive`x"
+                Proxy = "$TestProxy`x"
                 Path = $AlternativePath
             }
             Set-PSSlackConfig @params
             $Config = Import-Clixml $AlternativePath
 
-            $Config.Uri | Should be 'System.Security.SecureString'
-            $Config.Token | Should be 'System.Security.SecureString'
-            $Config.ArchiveUri | Should be 'TestArchivex'           
+            $Config.Uri | Should BeOfType System.Security.SecureString
+            $Config.Token | Should BeOfType System.Security.SecureString
+            $Config.ArchiveUri | Should Be 'TestArchivex'
+            $Config.Proxy | Should Be 'TestProxyx'
         }
     }
 }
@@ -94,18 +102,20 @@ Describe "Get-PSSlackConfig PS$PSVersion" {
         It 'Should read PSSlack.xml' {
             $Config = Get-PSSlackConfig -Source PSSlack.xml
 
-            $Config.Uri | Should be 'TestUri'
-            $Config.Token | Should be 'TestToken'
-            $Config.ArchiveUri | Should be 'TestArchive'
+            $Config.Uri | Should Be 'TestUri'
+            $Config.Token | Should Be 'TestToken'
+            $Config.ArchiveUri | Should Be 'TestArchive'
+            $Config.Proxy | Should Be 'TestProxy'
         }
-        
+
         It 'Should read PSSlack variable' {
             $Config = Get-PSSlackConfig -Source PSSlack
 
-            $Config.Uri | Should be 'TestUri'
-            $Config.Token | Should be 'TestToken'
-            $Config.ArchiveUri | Should be 'TestArchivex' #From running alternate path test before...
-        }
+            $Config.Uri | Should Be 'TestUri'
+            $Config.Token | Should Be 'TestToken'
+            $Config.ArchiveUri | Should Be 'TestArchivex' #From running alternate path test before...
+            $Config.Proxy | Should Be 'TestProxyx' #From running alternate path test before...
+    }
 
         It 'Should read a user-specified file' {
             # We've tested set... use it here.
@@ -113,21 +123,23 @@ Describe "Get-PSSlackConfig PS$PSVersion" {
                 Uri= $TestUri
                 Token = $TestToken
                 ArchiveUri = "$TestArchive`x"
+                Proxy = "$TestProxy`x"
                 Path = $AlternativePath
             }
             Set-PSSlackConfig @params
 
             $Config = Get-PSSlackConfig -Path $AlternativePath
 
-            $Config.Uri | Should be 'TestUri'
-            $Config.Token | Should be 'TestToken'
-            $Config.ArchiveUri | Should be 'TestArchivex'
+            $Config.Uri | Should Be 'TestUri'
+            $Config.Token | Should Be 'TestToken'
+            $Config.ArchiveUri | Should Be 'TestArchivex'
+            $Config.Proxy | Should Be 'TestProxyx'
         }
     }
 }
 
 # Tests have passed, rely on set-psslackconfig...
-Set-PSSlackConfig -Uri $null -Token $null -ArchiveUri $null
+Set-PSSlackConfig -Uri $null -Token $null -ArchiveUri $null -Proxy $null
 
 
 Describe "Send-SlackMessage PS$PSVersion" {
@@ -158,7 +170,7 @@ Describe "Send-SlackMessage PS$PSVersion" {
 
         It 'Should not pass parameters if not specified' {
             $x = Send-SlackMessage -Token Token -Text 'Hi'
-            $x.arg.count | Should be 6
+            $x.arg.count | Should Be 6
             $x.arg -contains '-Body:' | Should Be $True
             $x.arg -contains '-Method:' | Should Be $True
             $x.arg -contains '-Token:' | Should Be $True
@@ -169,4 +181,3 @@ Describe "Send-SlackMessage PS$PSVersion" {
 }
 
 Remove-Item $ModulePath\$env:USERNAME-$env:COMPUTERNAME-PSSlack.xml -force -Confirm:$False
-Remove-Item $AlternativePath -Force -Confirm:$False
